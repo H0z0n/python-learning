@@ -1,4 +1,0 @@
-Sasha:100
-Alice:95
-Jack:55
-Michal:0
