@@ -1,0 +1,5 @@
+score.txt
+weapons.txt
+__pycache__/
+*.pyc
+.env
