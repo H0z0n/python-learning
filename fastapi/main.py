@@ -1,57 +1,72 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel
+from sqlalchemy import create_engine, Column, Integer, String
+from sqlalchemy.orm import declarative_base, sessionmaker, Session
 
 app = FastAPI()
 
-
-# Задача №1
-# @app.get("/")
-# def read_root():
-#     return {"message": "Привет мир!"}
-
-
-# @app.get("/weapons/{weapon_name}")
-# def get_weapon(weapon_name: str):
-#     return {"weapon_name": weapon_name, "status": "Готов к бою!"}
-
-
-# @app.get("/reload")
-# def reloading(weapon_name: str, amount: int = 30):
-#     return {"weapon_name": weapon_name, "reloaded_with": amount}
-
-
-# Задача №2 и №3
-class Player(BaseModel):
+class CreatePlayer(BaseModel):
     name: str
     hp: int
     level: int = 1 
 
-players_db: list = []
+
+DATABASE_URL = "postgresql://postgres:root@127.0.0.1:5432/test_db"
+
+engine = create_engine(DATABASE_URL)
+Base = declarative_base()
+
+class PlayerDB(Base):
+    __tablename__ = "players"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String)
+    hp = Column(Integer)
+    level = Column(Integer, default=1)
+
+SessionLocal = sessionmaker(bind=engine)
+Base.metadata.create_all(bind=engine)
 
 
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+# Создание игрока и сохранение словаря с параметрами игрока в список -->>
 @app.post("/players")
-def new_player(player: Player):
-    players_db.append(player.model_dump())
-    return {"message": f"Игрок {player.name} создан!", "hp": player.hp, "level": player.level} 
+def new_player(player: CreatePlayer, db: Session = Depends(get_db)):
+    new_player_db = PlayerDB(name=player.name, hp=player.hp, level=player.level)
+    db.add(new_player_db)
+    db.commit()
+    db.refresh(new_player_db)
+
+    return {"message": f"Игрок {new_player_db.name} создан!", "hp": new_player_db.hp, "level": new_player_db.level, "id": new_player_db.id} 
 
 
 @app.get("/players")
-def get_players_list():
-    return players_db
+def get_players_list(db: Session = Depends(get_db)):
+    return db.query(PlayerDB).all()
 
 
 @app.get("/players/{id}")
-def get_player_from_id(id: int):
-    if id < 0 or id >= len(players_db):
+def get_player_from_id(id: int, db: Session = Depends(get_db)):
+    player = db.query(PlayerDB).filter(PlayerDB.id == id).first()
+    if player is None:
         raise HTTPException(status_code=404, detail="Игрок не найден!")
 
-    return players_db[id]
+    return player
 
 
 @app.delete("/players/{id}")
-def delete_player_from_id(id: int):
-    if id < 0 or id >= len(players_db):
+def delete_player_from_id(id: int, db: Session = Depends(get_db)):
+    player = db.query(PlayerDB).filter(PlayerDB.id == id).first()
+    if player is None:
         raise HTTPException(status_code=404, detail="Игрок не найден!")
+    db.delete(player)
+    db.commit()
 
-    removed_player = players_db.pop(id)
-    return {"message": "Игрок успешно удалён!", "removed_player": removed_player, "id": id}
+    return {"message": "Игрок успешно удалён!", "removed_player": player, "id": id}
