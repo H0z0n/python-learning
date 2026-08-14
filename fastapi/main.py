@@ -24,6 +24,14 @@ class PlayerDB(Base):
     hp = Column(Integer)
     level = Column(Integer, default=1)
 
+
+class WeaponDB(Base):
+    __tablename__ = "weapons"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String)
+    ammo = Column(Integer)
+
 SessionLocal = sessionmaker(bind=engine)
 Base.metadata.create_all(bind=engine)
 
@@ -40,6 +48,7 @@ def get_db():
 @app.post("/players")
 def new_player(player: CreatePlayer, db: Session = Depends(get_db)):
     new_player_db = PlayerDB(name=player.name, hp=player.hp, level=player.level)
+    
     db.add(new_player_db)
     db.commit()
     db.refresh(new_player_db)
@@ -66,7 +75,18 @@ def delete_player_from_id(id: int, db: Session = Depends(get_db)):
     player = db.query(PlayerDB).filter(PlayerDB.id == id).first()
     if player is None:
         raise HTTPException(status_code=404, detail="Игрок не найден!")
+    
     db.delete(player)
     db.commit()
 
     return {"message": "Игрок успешно удалён!", "removed_player": player, "id": id}
+
+
+@app.get("/weapons/{id}")
+def get_weapon_from_id(id: int, db: Session = Depends(get_db)):
+    weapon = db.query(WeaponDB).filter(WeaponDB.id == id).first()
+
+    if weapon is None:
+        raise HTTPException(status_code=404, detail="Оружие не найдено!")
+
+    return weapon
