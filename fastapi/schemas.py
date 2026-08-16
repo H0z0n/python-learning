@@ -10,9 +10,13 @@ class UserLogin(BaseModel):
 
 class Token(BaseModel):
     access_token: str
+    refresh_token: str
     token_type: str
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
 
 class CreatePlayer(BaseModel):
     name: str
     hp: int
-    level: int = 1 
+    level: int = 1

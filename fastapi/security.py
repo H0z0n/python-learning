@@ -15,8 +15,10 @@ SECRET_TOKEN = os.getenv("SECRET_TOKEN")
 if SECRET_TOKEN is None:
     raise ValueError("SECRET_TOKEN не найден! Убедись, что .env файл создан и корректно заполнен!")
 
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 30))
+REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", 7))
+
 ALGORITHM_TYPE = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 security = HTTPBearer()
 
@@ -42,6 +44,14 @@ def create_token(data: dict) -> str:
     return encoded_jwt
 
 
+def create_refresh_token(data: dict) -> str:
+    copy_data = data.copy()
+    expire_time = datetime.now() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    copy_data.update({"exp": expire_time, "type": "refresh"})
+    encode_jwt = jwt.encode(copy_data, SECRET_TOKEN, ALGORITHM_TYPE)
+    return encode_jwt
+
+
 def decode_token(token: str) -> dict | None:
     try:
         decoded_token = jwt.decode(token, SECRET_TOKEN, ALGORITHM_TYPE)
@@ -56,13 +66,17 @@ def get_current_user(
     ):
     token = credentials.credentials
     payload = decode_token(token)
+
     if payload is None:
         raise HTTPException(status_code=401, detail="Невалидный или истёкший токен!")
 
+    if payload.get("type") == "refresh":
+        raise HTTPException(status_code=401, detail="Нельзя использовать refresh-токен!")
+    
     username = payload.get("username")
-    user_db = db.query(UsersDB).filter(UsersDB.username == username).first()
+    db_user = db.query(UsersDB).filter(UsersDB.username == username).first()
 
-    if user_db is None:
+    if db_user is None:
         raise HTTPException(status_code=401, detail="Пользователь не найден!")
 
-    return user_db
+    return db_user
