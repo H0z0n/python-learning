@@ -1,7 +1,13 @@
+import os
+from dotenv import load_dotenv
 from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-DATABASE_URL = "postgresql://postgres:root@127.0.0.1:5432/test_db"
+load_dotenv()
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+if DATABASE_URL is None:
+    raise ValueError("DATABASE_URL не найден! Убедись, что .env файл создан и корректно заполнен!")
 
 engine = create_engine(DATABASE_URL)
 Base = declarative_base()

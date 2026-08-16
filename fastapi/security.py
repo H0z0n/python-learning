@@ -1,3 +1,5 @@
+import os
+from dotenv import load_dotenv
 import bcrypt
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
@@ -7,7 +9,12 @@ from sqlalchemy.orm import Session
 
 from database import get_db, UsersDB
 
-SECRET_TOKEN = "my-secret-token"
+load_dotenv()
+
+SECRET_TOKEN = os.getenv("SECRET_TOKEN")
+if SECRET_TOKEN is None:
+    raise ValueError("SECRET_TOKEN не найден! Убедись, что .env файл создан и корректно заполнен!")
+
 ALGORITHM_TYPE = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
