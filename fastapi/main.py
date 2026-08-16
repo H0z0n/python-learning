@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
@@ -34,6 +35,8 @@ Base = declarative_base()
 SECRET_TOKEN = "my-secret-token"
 ALGORITHM_TYPE = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+security = HTTPBearer()
 
 class UsersDB(Base):
     __tablename__ = "users"
@@ -90,12 +93,30 @@ def create_token(data: dict) -> str:
     return encoded_jwt
 
 
-def decode_token(token: str) -> str:
+def decode_token(token: str) -> dict | None:
     try:
         decoded_token = jwt.decode(token, SECRET_TOKEN, ALGORITHM_TYPE)
         return decoded_token
     except JWTError:
         return None
+
+
+def get_current_user(
+        credentials: HTTPAuthorizationCredentials = Depends(security), 
+        db: Session = Depends(get_db)
+    ):
+    token = credentials.credentials
+    payload = decode_token(token)
+    if payload is None:
+        raise HTTPException(status_code=401, detail="Невалидный или истёкший токен!")
+
+    username = payload.get("username")
+    user_db = db.query(UsersDB).filter(UsersDB.username == username).first()
+
+    if user_db is None:
+        raise HTTPException(status_code=401, detail="Пользователь не найден!")
+
+    return user_db
 
 
 # Регистрация и авторизация юзеров -->>
@@ -128,14 +149,23 @@ def user_login(user: UserLogin, db: Session = Depends(get_db)):
 
 # Создание игрока и сохранение словаря с параметрами игрока в список -->>
 @app.post("/players")
-def new_player(player: CreatePlayer, db: Session = Depends(get_db)):
+def new_player(
+        player: CreatePlayer, 
+        db: Session = Depends(get_db), 
+        current_user: UsersDB = Depends(get_current_user)
+    ):
     new_player_db = PlayersDB(name=player.name, hp=player.hp, level=player.level)
     
     db.add(new_player_db)
     db.commit()
     db.refresh(new_player_db)
 
-    return {"message": f"Игрок {new_player_db.name} создан!", "hp": new_player_db.hp, "level": new_player_db.level, "id": new_player_db.id} 
+    return {
+        "message": f"Игрок {new_player_db.name} создан пользователем: {current_user.username}", 
+        "hp": new_player_db.hp, 
+        "level": new_player_db.level, 
+        "id": new_player_db.id
+    } 
 
 
 @app.get("/players")
