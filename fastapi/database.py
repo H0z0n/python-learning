@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, Column, Integer, String
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy import create_engine, Column, Integer, String, ForeignKey
+from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 
 load_dotenv()
 
@@ -26,6 +26,9 @@ class PlayersDB(Base):
     name = Column(String)
     hp = Column(Integer)
     level = Column(Integer, default=1)
+    weapon_id = Column(Integer, ForeignKey("weapons.id"))
+    
+    weapon = relationship("WeaponsDB")
 
 class WeaponsDB(Base):
     __tablename__ = "weapons"

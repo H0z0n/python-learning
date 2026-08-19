@@ -20,3 +20,6 @@ class CreatePlayer(BaseModel):
     name: str
     hp: int
     level: int = 1
+
+class SetWeapon(BaseModel):
+    weapon_id: int
