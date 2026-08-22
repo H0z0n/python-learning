@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from schemas import CreatePlayer, SetWeapon
@@ -31,11 +32,13 @@ def new_player(
 
 @router.patch("/players/{id}/weapon")
 def set_player_weapon(id: int, data: SetWeapon, db: Session = Depends(get_db)):
-    player = db.query(PlayersDB).filter(PlayersDB.id == id).first()
+    stmt = select(PlayersDB).where(PlayersDB.id == id)
+    player = db.execute(stmt).scalars().first()
     if player is None:
         raise HTTPException(status_code=404, detail="Игрок не найдено!")
 
-    weapon = db.query(WeaponsDB).filter(WeaponsDB.id == data.weapon_id).first()
+    stmt = select(WeaponsDB).where(WeaponsDB.id, data.weapon_id)
+    weapon = db.execute(stmt).scalars().first()
     if weapon is None:
         raise HTTPException(status_code=404, detail="Оружие не найдено!")
 
@@ -48,7 +51,8 @@ def set_player_weapon(id: int, data: SetWeapon, db: Session = Depends(get_db)):
 
 @router.get("/players")
 def get_players_list(db: Session = Depends(get_db)):
-    players = db.query(PlayersDB).all()
+    stmt = select(PlayersDB).join(PlayersDB.weapon)
+    players = db.execute(stmt).scalars().all()
 
     result = []
     for player in players:
@@ -65,7 +69,8 @@ def get_players_list(db: Session = Depends(get_db)):
 
 @router.get("/players/{id}")
 def get_player_from_id(id: int, db: Session = Depends(get_db)):
-    player = db.query(PlayersDB).filter(PlayersDB.id == id).first()
+    stmt = select(PlayersDB).where(PlayersDB.id == id)
+    player = db.execute(stmt).scalars().first()
     if player is None:
         raise HTTPException(status_code=404, detail="Игрок не найден!")
 
@@ -80,7 +85,8 @@ def get_player_from_id(id: int, db: Session = Depends(get_db)):
 
 @router.delete("/players/{id}")
 def delete_player_from_id(id: int, db: Session = Depends(get_db)):
-    player = db.query(PlayersDB).filter(PlayersDB.id == id).first()
+    stmt = select(PlayersDB).where(PlayersDB.id == id)
+    player = db.execute(stmt).scalars().first()
     if player is None:
         raise HTTPException(status_code=404, detail="Игрок не найден!")
     

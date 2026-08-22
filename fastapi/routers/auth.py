@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from database import get_db, UsersDB
@@ -11,12 +12,13 @@ router = APIRouter()
 # Регистрация и авторизация юзеров -->>
 @router.post("/register")
 def user_register(user: UserRegister, db: Session = Depends(get_db)):
-    new_user = db.query(UsersDB).filter(UsersDB.username == user.username).first()
+    stmt = select(UsersDB).where(UsersDB.username == user.username)
+    new_user = db.execute(stmt).scalars().first()
 
     if new_user is not None:
         raise HTTPException(status_code=400, detail="Пользователь с таким логином уже существует!")
 
-    new_user = UsersDB(username = user.username, hashed_password = hash_password(user.password))
+    new_user = UsersDB(username=user.username, hashed_password=hash_password(user.password))
 
     db.add(new_user)
     db.commit()
@@ -27,7 +29,8 @@ def user_register(user: UserRegister, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=Token)
 def user_login(user: UserLogin, db: Session = Depends(get_db)):
-    db_user = db.query(UsersDB).filter(UsersDB.username == user.username).first()
+    stmt = select(UsersDB).where(UsersDB.username == user.username)
+    db_user = db.execute(stmt).scalars().first()
 
     if db_user is None or not verify_password(user.password, db_user.hashed_password):
         raise HTTPException(status_code=401, detail="Неверное имя пользователя или пароль!")
@@ -46,7 +49,8 @@ def refresh_access_token(request: RefreshRequest, db: Session = Depends(get_db))
         raise HTTPException(status_code=401, detail="Невалидный refresh-токен!")
 
     username = payload.get("username")
-    db_user = db.query(UsersDB).filter(UsersDB.username == username).first()
+    stmt = select(UsersDB).where(UsersDB.username == username)
+    db_user = db.execute(stmt).scalars().first()
 
     if db_user is None:
         raise HTTPException(status_code=401, detail="Пользователь не найден!")
